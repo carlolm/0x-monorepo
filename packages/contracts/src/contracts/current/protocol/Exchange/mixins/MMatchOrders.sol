@@ -21,41 +21,52 @@ pragma experimental ABIEncoderV2;
 import "../LibOrder.sol";
 import "./MExchangeCore.sol";
 
-contract MMatchOrders is LibOrder, MExchangeCore {
+contract MMatchOrders is
+    LibOrder,
+    MExchangeCore
+{
 
     struct MatchedOrderFillAmounts {
         FillResults left;
         FillResults right;
     }
 
+    /// This struct exists solely to avoid the stack limit constraint
+    /// in matchOrders
+    struct OrderInfo {
+        uint8 orderStatus;
+        bytes32 orderHash;
+        uint256 orderFilledAmount;
+    }
+
     /// @dev Validates context for matchOrders. Succeeds or throws.
-    /// @param left First order to match.
-    /// @param right Second order to match.
+    /// @param leftOrder First order to match.
+    /// @param rightOrder Second order to match.
     function validateMatchOrdersContextOrRevert(
-        Order memory left,
-        Order memory right)
+        Order memory leftOrder,
+        Order memory rightOrder)
         internal;
 
 
-    /// @dev Validates context for matchOrders.
+    /// @dev Calculates fill amounts for the matched orders.
     ///      Each order is filled at their respective price point. However, the calculations are
     ///      carried out as though the orders are both being filled at the right order's price point.
-    ///      The profit made by the left order goes to the taker (who matched the two orders).
-    /// @param left First order to match.
-    /// @param right Second order to match.
-    /// @param leftStatus Order status of left order.
-    /// @param rightStatus Order status of right order.
-    /// @param leftFilledAmount Amount of left order already filled.
-    /// @param rightFilledAmount Amount of right order already filled.
+    ///      The profit made by the leftOrder order goes to the taker (who matched the two orders).
+    /// @param leftOrder First order to match.
+    /// @param rightOrder Second order to match.
+    /// @param leftOrderStatus Order status of left order.
+    /// @param rightOrderStatus Order status of right order.
+    /// @param leftOrderFilledAmount Amount of left order already filled.
+    /// @param rightOrderFilledAmount Amount of right order already filled.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
     /// @return matchedFillOrderAmounts Amounts to fill left and right orders.
     function getMatchedFillAmounts(
-        Order memory left,
-        Order memory right,
-        uint8 leftStatus,
-        uint8 rightStatus,
-        uint256 leftFilledAmount,
-        uint256 rightFilledAmount)
+        Order memory leftOrder,
+        Order memory rightOrder,
+        uint8 leftOrderStatus,
+        uint8 rightOrderStatus,
+        uint256 leftOrderFilledAmount,
+        uint256 rightOrderFilledAmount)
         internal
         returns (
             uint8 status,
@@ -65,15 +76,15 @@ contract MMatchOrders is LibOrder, MExchangeCore {
     ///      Each order is filled at their respective price point. However, the calculations are
     ///      carried out as though the orders are both being filled at the right order's price point.
     ///      The profit made by the left order goes to the taker (who matched the two orders).
-    /// @param left First order to match.
-    /// @param right Second order to match.
+    /// @param leftOrder First order to match.
+    /// @param rightOrder Second order to match.
     /// @param leftSignature Proof that order was created by the left maker.
     /// @param rightSignature Proof that order was created by the right maker.
     /// @return leftFillResults Amounts filled and fees paid by maker and taker of left order.
     /// @return leftFillResults Amounts filled and fees paid by maker and taker of right order.
     function matchOrders(
-        Order memory left,
-        Order memory right,
+        Order memory leftOrder,
+        Order memory rightOrder,
         bytes leftSignature,
         bytes rightSignature)
         public

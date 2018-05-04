@@ -24,6 +24,13 @@ import "./MMatchOrders.sol";
 
 contract MSettlement is LibOrder, MMatchOrders {
 
+    /// @dev Settles an order by transferring appropriate funds between maker, taker, and fee recipient.
+    /// @param order Order struct containing order specifications.
+    /// @param takerAddress Address of order taker.
+    /// @param takerAssetFilledAmount Amount of order filled by the taker.
+    /// @return makerAssetFilledAmount Amount spent by order maker.
+    /// @return makerFeePaid Fee amount paid by maker.
+    /// @return takerFeePaid Fee amount paid by taker.
     function settleOrder(
         Order memory order,
         address takerAddress,
@@ -35,7 +42,15 @@ contract MSettlement is LibOrder, MMatchOrders {
             uint256 takerFeePaid
         );
 
-        function settleMatchedOrders(Order memory left, Order memory right, MatchedOrderFillAmounts memory matchedFillOrderAmounts, address taker)
-            internal;
-
+    /// @dev Settles matched order by transferring appropriate funds between order makers, taker, and fee recipient.
+    /// @param left First matched order.
+    /// @param right Second matched order.
+    /// @param matchedFillOrderAmounts Struct holding amounts to transfer between makers, taker, and fee recipients.
+    /// @param taker Address that matched the orders. The taker receives the spread between orders as profit.
+    function settleMatchedOrders(
+        Order memory left,
+        Order memory right,
+        MatchedOrderFillAmounts memory matchedFillOrderAmounts,
+        address taker)
+        internal;
 }

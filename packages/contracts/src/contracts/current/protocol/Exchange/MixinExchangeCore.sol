@@ -78,14 +78,19 @@ contract MixinExchangeCore is
     );
 
 
-  // Core exchange functions
+    ////// Core exchange functions //////
 
 
-    function getOrderStatus(Order memory order)
+    /// @dev Gets information about an order.
+    /// @param order Order to gather information on.
+    /// @return status Status of order. Statuses are defined in the LibStatus.Status struct.
+    /// @return orderHash Keccak-256 EIP712 hash of the order.
+    /// @return filledAmount Amount of order that has been filled.
+    function getOrderInfo(Order memory order)
         public
         view
         returns (
-            uint8 status,
+            uint8 orderStatus,
             bytes32 orderHash,
             uint256 filledAmount)
     {
@@ -94,13 +99,12 @@ contract MixinExchangeCore is
         filledAmount = filled[orderHash];
 
         // If order.takerAssetAmount is zero, then the order will always
-        // be considered filled because:
-        //    0 == takerAssetAmount == filledAmount
+        // be considered filled because 0 == takerAssetAmount == filledAmount
         // Instead of distinguishing between unfilled and filled zero taker
         // amount orders, we choose not to support them.
         if (order.takerAssetAmount == 0) {
-            status = uint8(Status.INVALID);
-            return;
+            orderStatus = uint8(Status.INVALID);
+            return (orderStatus, orderHash, filledAmount);
         }
 
         // If order.makerAssetAmount is zero, we also reject the order.
@@ -108,41 +112,56 @@ contract MixinExchangeCore is
         // edge cases in the supporting infrastructure because they have
         // an 'infinite' price when computed by a simple division.
         if (order.makerAssetAmount == 0) {
-            status = uint8(Status.INVALID);
-            return;
+            orderStatus = uint8(Status.INVALID);
+            return (orderStatus, orderHash, filledAmount);
         }
 
         // Validate order expiration
         if (block.timestamp >= order.expirationTimeSeconds) {
-            status = uint8(Status.ORDER_EXPIRED);
-            return;
+            orderStatus = uint8(Status.ORDER_EXPIRED);
+            return (orderStatus, orderHash, filledAmount);
         }
 
         // Validate order availability
         if (filledAmount >= order.takerAssetAmount) {
-            status = uint8(Status.ORDER_FULLY_FILLED);
-            return;
+            orderStatus = uint8(Status.ORDER_FULLY_FILLED);
+            return (orderStatus, orderHash, filledAmount);
         }
 
         // Check if order has been cancelled
         if (cancelled[orderHash]) {
-            status = uint8(Status.ORDER_CANCELLED);
-            return;
+            orderStatus = uint8(Status.ORDER_CANCELLED);
+            return (orderStatus, orderHash, filledAmount);
         }
 
         // Validate order is not cancelled
         if (makerEpoch[order.makerAddress] > order.salt) {
-            status = uint8(Status.ORDER_CANCELLED);
-            return;
+            orderStatus = uint8(Status.ORDER_CANCELLED);
+            return (orderStatus, orderHash, filledAmount);
         }
 
         // Order is Fillable
-        status = uint8(Status.ORDER_FILLABLE);
-        return;
+        orderStatus = uint8(Status.ORDER_FILLABLE);
+        return (orderStatus, orderHash, filledAmount);
     }
 
-    function validateFillContextOrRevert(Order memory order, uint8 orderStatus, bytes32 orderHash, uint256 filledAmount, bytes memory signature, address takerAddress, uint256 takerAssetFillAmount)
-    private
+    /// @dev Validates context for fillOrder. Succeeds or throws.
+    /// @param order to be filled.
+    /// @param orderStatus Status of order to be filled.
+    /// @param orderHash Hash of order to be filled.
+    /// @param filledAmount Amount of order already filled.
+    /// @param signature Proof that the orders was created by its maker.
+    /// @param takerAddress Address of order taker.
+    /// @param takerAssetFillAmount Desired amount of order to fill by taker.
+    function validateFillOrderContextOrRevert(
+        Order memory order,
+        uint8 orderStatus,
+        bytes32 orderHash,
+        uint256 filledAmount,
+        bytes memory signature,
+        address takerAddress,
+        uint256 takerAssetFillAmount)
+        internal
     {
         // Ensure order status is not invalid
         if (orderStatus == uint8(Status.INVALID)) {
@@ -175,12 +194,18 @@ contract MixinExchangeCore is
         }
     }
 
+    /// @dev Calculates amounts filled and fees paid by maker and taker.
+    /// @param order to be filled.
+    /// @param orderStatus Status of order to be filled.
+    /// @param filledAmount Amount of order already filled.
+    /// @param takerAssetFillAmount Desired amount of order to fill by taker.
+    /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
+    /// @return fillResults Amounts filled and fees paid by maker and taker.
     function getFillAmounts(
         Order memory order,
         uint8 orderStatus,
         uint256 filledAmount,
-        uint256 takerAssetFillAmount,
-        address takerAddress)
+        uint256 takerAssetFillAmount)
         public
         pure
         returns (
@@ -233,6 +258,10 @@ contract MixinExchangeCore is
         return;
     }
 
+    /// @dev Updates state with results of a fill order.
+    /// @param order that was filled.
+    /// @param takerAddress Address of taker who filled the order.
+    /// @return fillResults Amounts filled and fees paid by maker and taker.
     function updateFilledState(
         Order memory order,
         address takerAddress,
@@ -263,17 +292,17 @@ contract MixinExchangeCore is
         bytes32 orderHash;
         uint8 orderStatus;
         uint256 filledAmount;
-        (orderStatus, orderHash, filledAmount) = getOrderStatus(order);
+        (orderStatus, orderHash, filledAmount) = getOrderInfo(order);
 
         // Fetch taker address
         address takerAddress = getCurrentContextAddress();
 
         // Either our context is valid or we revert
-        validateFillContextOrRevert(order, orderStatus, orderHash, filledAmount, signature, takerAddress, takerAssetFillAmount);
+        validateFillOrderContextOrRevert(order, orderStatus, orderHash, filledAmount, signature, takerAddress, takerAssetFillAmount);
 
         // Compute proportional fill amounts
         uint8 status;
-        (status, fillResults) = getFillAmounts(order, orderStatus, filledAmount, takerAssetFillAmount, takerAddress);
+        (status, fillResults) = getFillAmounts(order, orderStatus, filledAmount, takerAssetFillAmount);
         if (status != uint8(Status.SUCCESS)) {
             emit ExchangeStatus(uint8(status), orderHash);
             return fillResults;
@@ -288,8 +317,15 @@ contract MixinExchangeCore is
         return fillResults;
     }
 
-    function validateCancelContextOrRevert(Order memory order, uint8 orderStatus, bytes32 orderHash)
-        private
+    /// @dev Validates context for cancelOrder. Succeeds or throws.
+    /// @param order that was cancelled.
+    /// @param orderStatus Status of order that was cancelled.
+    /// @param orderHash Hash of order that was cancelled.
+    function validateCancelOrderContextOrRevert(
+        Order memory order,
+        uint8 orderStatus,
+        bytes32 orderHash)
+        internal
     {
         // Ensure order is valid
         if (orderStatus == uint8(Status.INVALID)) {
@@ -311,21 +347,30 @@ contract MixinExchangeCore is
         }
     }
 
+    /// @dev Updates state with results of cancelling an order.
+    ///      State is only updated if the order is currently fillable.
+    ///      Otherwise, updating state would have no effect.
+    /// @param order that was cancelled.
+    /// @param orderStatus Status of order that was cancelled.
+    /// @param orderHash Hash of order that was cancelled.
+    /// @return stateUpdated Returns true only if state was updated.
     function updateCancelledState(
         Order memory order,
         uint8 orderStatus,
         bytes32 orderHash)
-        private
-        returns (bool)
+        internal
+        returns (bool stateUpdated)
     {
         // Ensure order is fillable (otherwise cancelling does nothing)
         if (orderStatus != uint8(Status.ORDER_FILLABLE)) {
             emit ExchangeStatus(uint8(orderStatus), orderHash);
-            return false;
+            stateUpdated = false;
+            return stateUpdated;
         }
 
         // Perform cancel
         cancelled[orderHash] = true;
+        stateUpdated = true;
 
         // Log cancel
         emit Cancel(
@@ -335,6 +380,8 @@ contract MixinExchangeCore is
             order.makerAssetData,
             order.takerAssetData
         );
+
+        return stateUpdated;
     }
 
     /// @dev After calling, the order can not be filled anymore.
@@ -349,10 +396,10 @@ contract MixinExchangeCore is
         bytes32 orderHash;
         uint8 orderStatus;
         uint256 filledAmount;
-        (orderStatus, orderHash, filledAmount) = getOrderStatus(order);
+        (orderStatus, orderHash, filledAmount) = getOrderInfo(order);
 
         // Validate context
-        validateCancelContextOrRevert(order, orderStatus, orderHash);
+        validateCancelOrderContextOrRevert(order, orderStatus, orderHash);
 
         // Perform cancel
         return updateCancelledState(order, orderStatus, orderHash);
