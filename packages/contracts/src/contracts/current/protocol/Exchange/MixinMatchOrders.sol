@@ -105,7 +105,7 @@ contract MixinMatchOrders is
                 leftOrderFilledAmount,
                 leftTakerAssetAmountRemaining);
             if(status != uint8(Status.SUCCESS)) {
-                return;
+                return (status, matchedFillOrderAmounts);
             }
 
             // The right order just spent <leftTakerAssetAmountRemaining> of their maker asset to fill the left order.
@@ -114,7 +114,7 @@ contract MixinMatchOrders is
             // =  <matchedFillOrderAmounts.left.takerAssetFilledAmount> * <rightOrder.takerAssetAmount> / <rightOrder.makerAssetAmount>
             if(isRoundingError(rightOrder.takerAssetAmount, rightOrder.makerAssetAmount, matchedFillOrderAmounts.left.takerAssetFilledAmount)) {
                 status = uint8(Status.ROUNDING_ERROR_TOO_LARGE);
-                return;
+                return (status, matchedFillOrderAmounts);
             }
             uint256 rightOrderAmountToFill = getPartialAmount(
                 rightOrder.takerAssetAmount,
@@ -130,7 +130,7 @@ contract MixinMatchOrders is
                 rightOrderFilledAmount,
                 rightOrderAmountToFill);
             if(status != uint8(Status.SUCCESS)) {
-                return;
+                return (status, matchedFillOrderAmounts);
             }
 
             // The right order must spend at least as much as we're transferring to the left order's maker.
@@ -139,7 +139,7 @@ contract MixinMatchOrders is
             assert(matchedFillOrderAmounts.right.makerAssetFilledAmount >= matchedFillOrderAmounts.left.takerAssetFilledAmount);
             if(isRoundingError(matchedFillOrderAmounts.right.makerAssetFilledAmount, matchedFillOrderAmounts.left.takerAssetFilledAmount, 1)) {
                 status = uint8(Status.ROUNDING_ERROR_TOO_LARGE);
-                return;
+                return (status, matchedFillOrderAmounts);
             }
         } else {
             // Right order is the constraint: maximally fill right
@@ -151,7 +151,7 @@ contract MixinMatchOrders is
                 rightOrderFilledAmount,
                 rightTakerAssetAmountRemaining);
             if(status != uint8(Status.SUCCESS)) {
-                return;
+                return (status, matchedFillOrderAmounts);
             }
 
             // The left order just spent <rightTakerAssetAmountRemaining> of their maker asset to fill the right order.
@@ -171,12 +171,14 @@ contract MixinMatchOrders is
                 leftOrderFilledAmount,
                 matchedFillOrderAmounts.right.makerAssetFilledAmount);
             if(status != uint8(Status.SUCCESS)) {
-                return;
+                return (status, matchedFillOrderAmounts);
             }
 
             // Sanity check: the amount sent from the right order must equal the amount received by the left order.
             assert(matchedFillOrderAmounts.right.makerAssetFilledAmount == matchedFillOrderAmounts.left.takerAssetFilledAmount);
         }
+
+        return (status, matchedFillOrderAmounts);
     }
 
     /// @dev Match two complementary orders that have a positive spread.
@@ -206,7 +208,7 @@ contract MixinMatchOrders is
         ) = getOrderInfo(leftOrder);
         if(leftOrderInfo.orderStatus != uint8(Status.ORDER_FILLABLE)) {
             emit ExchangeStatus(uint8(leftOrderInfo.orderStatus), leftOrderInfo.orderHash);
-            return;
+            return matchedFillOrderAmounts;
         }
 
         // Get right status
@@ -217,7 +219,7 @@ contract MixinMatchOrders is
         ) = getOrderInfo(rightOrder);
         if(rightOrderInfo.orderStatus != uint8(Status.ORDER_FILLABLE)) {
             emit ExchangeStatus(uint8(rightOrderInfo.orderStatus), rightOrderInfo.orderHash);
-            return;
+            return matchedFillOrderAmounts;
         }
 
         // Fetch taker address
@@ -238,7 +240,7 @@ contract MixinMatchOrders is
             leftOrderInfo.orderFilledAmount,
             rightOrderInfo.orderFilledAmount);
         if(matchedFillAmountsStatus != uint8(Status.SUCCESS)) {
-            return;
+            return matchedFillOrderAmounts;
         }
 
         // Validate fill contexts
