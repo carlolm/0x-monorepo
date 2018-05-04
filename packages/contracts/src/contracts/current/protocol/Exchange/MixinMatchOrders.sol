@@ -36,8 +36,13 @@ contract MixinMatchOrders is
     MTransactions
     {
 
-    function validateMatchOrdersContextOrRevert(Order memory left, Order memory right)
-        private
+    /// @dev Validates context for matchOrders. Succeeds or throws.
+    /// @param left First order to match.
+    /// @param right Second order to match.
+    function validateMatchOrdersContextOrRevert(
+        Order memory left,
+        Order memory right)
+        internal
     {
         // The Left Order's maker asset must be the same as the Right Order's taker asset.
         require(areBytesEqual(left.makerAssetData, right.takerAssetData));
@@ -56,11 +61,30 @@ contract MixinMatchOrders is
         require(safeMul(left.makerAssetAmount, right.makerAssetAmount) >= safeMul(left.takerAssetAmount, right.takerAssetAmount));
     }
 
-    function getMatchedFillAmounts(Order memory left, Order memory right, uint8 leftStatus, uint8 rightStatus, uint256 leftFilledAmount, uint256 rightFilledAmount)
-        private
-        returns (uint8 status, MatchedOrderFillAmounts memory matchedFillOrderAmounts)
+    /// @dev Validates context for matchOrders.
+    ///      Each order is filled at their respective price point. However, the calculations are
+    ///      carried out as though the orders are both being filled at the right order's price point.
+    ///      The profit made by the left order goes to the taker (who matched the two orders).
+    /// @param left First order to match.
+    /// @param right Second order to match.
+    /// @param leftStatus Order status of left order.
+    /// @param rightStatus Order status of right order.
+    /// @param leftFilledAmount Amount of left order already filled.
+    /// @param rightFilledAmount Amount of right order already filled.
+    /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
+    /// @return matchedFillOrderAmounts Amounts to fill left and right orders.
+    function getMatchedFillAmounts(
+        Order memory left,
+        Order memory right,
+        uint8 leftStatus,
+        uint8 rightStatus,
+        uint256 leftFilledAmount,
+        uint256 rightFilledAmount)
+        internal
+        returns (
+            uint8 status,
+            MatchedOrderFillAmounts memory matchedFillOrderAmounts)
     {
-        // The goal is for taker to obtain the maximum number of left maker asset.
         // We settle orders at the price point defined by the right order (profit goes to the order taker)
         // The constraint can be either on the left or on the right.
         // The constraint is on the left iff the amount required to fill the left order
@@ -98,7 +122,7 @@ contract MixinMatchOrders is
                 right.makerAssetAmount,
                 matchedFillOrderAmounts.left.takerAssetFilledAmount);
 
-            // Compute fill amounts
+            // Compute fill amounts for right order
             (   status,
                 matchedFillOrderAmounts.right
             ) = getFillAmounts(
@@ -139,7 +163,8 @@ contract MixinMatchOrders is
             //   (let Y = <matchedFillOrderAmounts.right.takerAssetFilledAmount>; let X = matchedFillOrderAmounts.right.makerAssetFilledAmount)
             // = Y * X / Y
             // = X = <matchedFillOrderAmounts.right.makerAssetFilledAmount>
-            // * We assert that amount transferred by the right order must not exceed the amount required to fill the left order.
+            //
+            // Sanity check: that the amount transferred by the right order does not exceed the amount required to fill the left order.
             assert(matchedFillOrderAmounts.right.makerAssetFilledAmount <= leftTakerAssetAmountRemaining);
             (   status,
                 matchedFillOrderAmounts.left
@@ -153,15 +178,21 @@ contract MixinMatchOrders is
                 return;
             }
 
-            // The amount sent from the right order must equal the amount received by the left order.
+            // Sanity check: the amount sent from the right order must equal the amount received by the left order.
             assert(matchedFillOrderAmounts.right.makerAssetFilledAmount == matchedFillOrderAmounts.left.takerAssetFilledAmount);
         }
     }
 
-    // Match two complementary orders that overlap.
-    // The taker will end up with the maximum amount of left.makerAsset
-    // Any right.makerAsset that taker would gain because of rounding are
-    // transfered to right.
+    /// @dev Match two complementary orders that have a positive spread.
+    ///      Each order is filled at their respective price point. However, the calculations are
+    ///      carried out as though the orders are both being filled at the right order's price point.
+    ///      The profit made by the left order goes to the taker (who matched the two orders).
+    /// @param left First order to match.
+    /// @param right Second order to match.
+    /// @param leftSignature Proof that order was created by the left maker.
+    /// @param rightSignature Proof that order was created by the right maker.
+    /// @return leftFillResults Amounts filled and fees paid by maker and taker of left order.
+    /// @return leftFillResults Amounts filled and fees paid by maker and taker of right order.
     function matchOrders(
         Order memory left,
         Order memory right,
@@ -169,12 +200,12 @@ contract MixinMatchOrders is
         bytes rightSignature)
         public
         returns (
-            uint256 leftFilledAmount,
-            uint256 rightFilledAmount)
+            MatchedOrderFillAmounts memory matchedFillOrderAmounts)
     {
         // Get left status
         uint8 leftStatus;
         bytes32 leftOrderHash;
+        uint256 leftFilledAmount;
         (   leftStatus,
             leftOrderHash,
             leftFilledAmount
@@ -187,6 +218,7 @@ contract MixinMatchOrders is
         // Get right status
         uint8 rightStatus;
         bytes32 rightOrderHash;
+        uint256 rightFilledAmount;
         (   rightStatus,
             rightOrderHash,
             rightFilledAmount
@@ -203,7 +235,6 @@ contract MixinMatchOrders is
         validateMatchOrdersContextOrRevert(left, right);
 
         // Compute proportional fill amounts
-        MatchedOrderFillAmounts memory matchedFillOrderAmounts;
         uint8 matchedFillAmountsStatus;
         (   matchedFillAmountsStatus,
             matchedFillOrderAmounts
@@ -234,5 +265,8 @@ contract MixinMatchOrders is
             rightOrderHash,
             matchedFillOrderAmounts.right
         );
+
+        // Return results
+        return matchedFillOrderAmounts;
     }
 }

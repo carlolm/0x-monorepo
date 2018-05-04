@@ -28,18 +28,49 @@ contract MMatchOrders is LibOrder, MExchangeCore {
         FillResults right;
     }
 
-    function validateMatchOrdersContextOrRevert(Order memory left, Order memory right)
-        private;
+    /// @dev Validates context for matchOrders. Succeeds or throws.
+    /// @param left First order to match.
+    /// @param right Second order to match.
+    function validateMatchOrdersContextOrRevert(
+        Order memory left,
+        Order memory right)
+        internal;
 
 
-        function getMatchedFillAmounts(Order memory left, Order memory right, uint8 leftStatus, uint8 rightStatus, uint256 leftFilledAmount, uint256 rightFilledAmount)
-            private
-            returns (uint8 status, MatchedOrderFillAmounts memory matchedFillOrderAmounts);
+    /// @dev Validates context for matchOrders.
+    ///      Each order is filled at their respective price point. However, the calculations are
+    ///      carried out as though the orders are both being filled at the right order's price point.
+    ///      The profit made by the left order goes to the taker (who matched the two orders).
+    /// @param left First order to match.
+    /// @param right Second order to match.
+    /// @param leftStatus Order status of left order.
+    /// @param rightStatus Order status of right order.
+    /// @param leftFilledAmount Amount of left order already filled.
+    /// @param rightFilledAmount Amount of right order already filled.
+    /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
+    /// @return matchedFillOrderAmounts Amounts to fill left and right orders.
+    function getMatchedFillAmounts(
+        Order memory left,
+        Order memory right,
+        uint8 leftStatus,
+        uint8 rightStatus,
+        uint256 leftFilledAmount,
+        uint256 rightFilledAmount)
+        internal
+        returns (
+            uint8 status,
+            MatchedOrderFillAmounts memory matchedFillOrderAmounts);
 
-    // Match two complementary orders that overlap.
-    // The taker will end up with the maximum amount of left.makerAsset
-    // Any right.makerAsset that taker would gain because of rounding are
-    // transfered to right.
+    /// @dev Match two complementary orders that have a positive spread.
+    ///      Each order is filled at their respective price point. However, the calculations are
+    ///      carried out as though the orders are both being filled at the right order's price point.
+    ///      The profit made by the left order goes to the taker (who matched the two orders).
+    /// @param left First order to match.
+    /// @param right Second order to match.
+    /// @param leftSignature Proof that order was created by the left maker.
+    /// @param rightSignature Proof that order was created by the right maker.
+    /// @return leftFillResults Amounts filled and fees paid by maker and taker of left order.
+    /// @return leftFillResults Amounts filled and fees paid by maker and taker of right order.
     function matchOrders(
         Order memory left,
         Order memory right,
@@ -47,6 +78,5 @@ contract MMatchOrders is LibOrder, MExchangeCore {
         bytes rightSignature)
         public
         returns (
-            uint256 leftFilledAmount,
-            uint256 rightFilledAmount);
+            MatchedOrderFillAmounts memory matchedFillOrderAmounts);
 }
