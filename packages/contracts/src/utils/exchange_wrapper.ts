@@ -262,6 +262,12 @@ export class ExchangeWrapper {
         tx.logs = _.map(tx.logs, log => this._logDecoder.decodeLogOrThrow(log));
         return tx;
     }
+    public async getOrderInfoAsync(
+        signedOrder: SignedOrder,
+    ): Promise<[number /* orderStatus */, string /* orderHash */, BigNumber /* orderTakerAssetAmountFilled */]> {
+        const orderInfo: [number, string, BigNumber] = await this._exchange.getOrderInfo.callAsync(signedOrder);
+        return orderInfo;
+    }
     public async matchOrdersAsync(
         signedOrderLeft: SignedOrder,
         signedOrderRight: SignedOrder,
