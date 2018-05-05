@@ -34,7 +34,7 @@ chaiSetup.configure();
 const expect = chai.expect;
 const blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
 
-describe.only('matchOrdersAndVerifyBalancesAsync', () => {
+describe('matchOrdersAndVerifyBalancesAsync', () => {
     let makerAddressLeft: string;
     let makerAddressRight: string;
     let owner: string;

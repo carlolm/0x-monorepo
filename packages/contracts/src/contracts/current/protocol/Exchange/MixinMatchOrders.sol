@@ -112,6 +112,7 @@ contract MixinMatchOrders is
             // The amount right gets in return is:
             //    <leftOrderAmountBought> * <rightOrderProfitPerUnitSold>
             // =  <matchedFillOrderAmounts.left.takerAssetFilledAmount> * <rightOrder.takerAssetAmount> / <rightOrder.makerAssetAmount>
+            // TODO: Ensure rounding error is in the right direction.
             if(isRoundingError(rightOrder.takerAssetAmount, rightOrder.makerAssetAmount, matchedFillOrderAmounts.left.takerAssetFilledAmount)) {
                 status = uint8(Status.ROUNDING_ERROR_TOO_LARGE);
                 return (status, matchedFillOrderAmounts);
