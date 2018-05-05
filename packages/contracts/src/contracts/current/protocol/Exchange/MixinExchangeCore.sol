@@ -201,7 +201,7 @@ contract MixinExchangeCore is
     /// @param takerAssetFillAmount Desired amount of order to fill by taker.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
     /// @return fillResults Amounts filled and fees paid by maker and taker.
-    function getFillAmounts(
+    function calculateFillAmounts(
         Order memory order,
         uint8 orderStatus,
         uint256 filledAmount,
@@ -302,7 +302,7 @@ contract MixinExchangeCore is
 
         // Compute proportional fill amounts
         uint8 status;
-        (status, fillResults) = getFillAmounts(order, orderStatus, filledAmount, takerAssetFillAmount);
+        (status, fillResults) = calculateFillAmounts(order, orderStatus, filledAmount, takerAssetFillAmount);
         if (status != uint8(Status.SUCCESS)) {
             emit ExchangeStatus(uint8(status), orderHash);
             return fillResults;

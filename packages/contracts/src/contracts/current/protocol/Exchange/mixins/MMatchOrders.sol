@@ -60,7 +60,7 @@ contract MMatchOrders is
     /// @param rightOrderFilledAmount Amount of right order already filled.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
     /// @return matchedFillOrderAmounts Amounts to fill left and right orders.
-    function getMatchedFillAmounts(
+    function calculateMatchedFillAmounts(
         Order memory leftOrder,
         Order memory rightOrder,
         uint8 leftOrderStatus,

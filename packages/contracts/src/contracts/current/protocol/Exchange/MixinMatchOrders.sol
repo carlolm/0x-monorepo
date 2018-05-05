@@ -73,7 +73,7 @@ contract MixinMatchOrders is
     /// @param rightOrderFilledAmount Amount of right order already filled.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
     /// @return matchedFillOrderAmounts Amounts to fill left and right orders.
-    function getMatchedFillAmounts(
+    function calculateMatchedFillAmounts(
         Order memory leftOrder,
         Order memory rightOrder,
         uint8 leftOrderStatus,
@@ -99,7 +99,7 @@ contract MixinMatchOrders is
             // Left order is the constraint: maximally fill left
             (   status,
                 matchedFillOrderAmounts.left
-            ) = getFillAmounts(
+            ) = calculateFillAmounts(
                 leftOrder,
                 leftOrderStatus,
                 leftOrderFilledAmount,
@@ -124,7 +124,7 @@ contract MixinMatchOrders is
             // Compute fill amounts for right order
             (   status,
                 matchedFillOrderAmounts.right
-            ) = getFillAmounts(
+            ) = calculateFillAmounts(
                 rightOrder,
                 rightOrderStatus,
                 rightOrderFilledAmount,
@@ -145,7 +145,7 @@ contract MixinMatchOrders is
             // Right order is the constraint: maximally fill right
             (   status,
                 matchedFillOrderAmounts.right
-            ) = getFillAmounts(
+            ) = calculateFillAmounts(
                 rightOrder,
                 rightOrderStatus,
                 rightOrderFilledAmount,
@@ -165,7 +165,7 @@ contract MixinMatchOrders is
             assert(matchedFillOrderAmounts.right.makerAssetFilledAmount <= leftTakerAssetAmountRemaining);
             (   status,
                 matchedFillOrderAmounts.left
-            ) = getFillAmounts(
+            ) = calculateFillAmounts(
                 leftOrder,
                 leftOrderStatus,
                 leftOrderFilledAmount,
@@ -232,7 +232,7 @@ contract MixinMatchOrders is
         uint8 matchedFillAmountsStatus;
         (   matchedFillAmountsStatus,
             matchedFillOrderAmounts
-        ) = getMatchedFillAmounts(
+        ) = calculateMatchedFillAmounts(
             leftOrder,
             rightOrder,
             leftOrderInfo.orderStatus,

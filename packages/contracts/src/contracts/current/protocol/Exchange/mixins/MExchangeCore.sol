@@ -68,7 +68,7 @@ contract MExchangeCore is LibOrder {
     /// @param takerAssetFillAmount Desired amount of order to fill by taker.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
     /// @return fillResults Amounts filled and fees paid by maker and taker.
-    function getFillAmounts(
+    function calculateFillAmounts(
         Order memory order,
         uint8 orderStatus,
         uint256 filledAmount,
