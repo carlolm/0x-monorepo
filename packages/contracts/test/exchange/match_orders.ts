@@ -409,7 +409,7 @@ describe('matchOrdersAndVerifyBalancesAsync', () => {
             );
             expect(rightOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FILLABLE);
             // Create second left order
-            // Note: This ored needs makerAssetAmount=96/takerAssetAmount=48 to fully fill the right order.
+            // Note: This order needs makerAssetAmount=96/takerAssetAmount=48 to fully fill the right order.
             //       However, we use 100/50 to ensure a partial fill as we want to go down the "right fill"
             //       branch in the contract twice for this test.
             const signedOrderLeft2 = orderFactoryLeft.newSignedOrder({
