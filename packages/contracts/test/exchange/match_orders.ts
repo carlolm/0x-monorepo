@@ -34,7 +34,7 @@ chaiSetup.configure();
 const expect = chai.expect;
 const blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
 
-describe.only('matchOrdersAndVerifyBalancesAsync', () => {
+describe('matchOrdersAndVerifyBalancesAsync', () => {
     let makerAddressLeft: string;
     let makerAddressRight: string;
     let owner: string;
@@ -179,7 +179,7 @@ describe.only('matchOrdersAndVerifyBalancesAsync', () => {
             expect(rightOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FULLY_FILLED);
         });
 
-        it.only('should transfer the correct amounts when orders completely fill each other and taker doesnt take a profit', async () => {
+        it('should transfer the correct amounts when orders completely fill each other and taker doesnt take a profit', async () => {
             // Create orders to match
             const signedOrderLeft = orderFactoryLeft.newSignedOrder({
                 makerAddress: makerAddressLeft,
