@@ -179,6 +179,48 @@ describe.only('matchOrdersAndVerifyBalancesAsync', () => {
             expect(rightOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FULLY_FILLED);
         });
 
+        it.only('should transfer the correct amounts when orders completely fill each other and taker doesnt take a profit', async () => {
+            // Create orders to match
+            const signedOrderLeft = orderFactoryLeft.newSignedOrder({
+                makerAddress: makerAddressLeft,
+                makerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultMakerAssetAddress),
+                takerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultTakerAssetAddress),
+                makerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(5), 18),
+                takerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(10), 18),
+                feeRecipientAddress: feeRecipientAddressLeft,
+            });
+            const signedOrderRight = orderFactoryRight.newSignedOrder({
+                makerAddress: makerAddressRight,
+                makerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultTakerAssetAddress),
+                takerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultMakerAssetAddress),
+                makerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(10), 18),
+                takerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(5), 18),
+                feeRecipientAddress: feeRecipientAddressRight,
+            });
+            // Store original taker balance
+            const takerInitialBalances = _.cloneDeep(erc20Balances[takerAddress][defaultMakerAssetAddress]);
+            // Match signedOrderLeft with signedOrderRight
+            const newErc20Balances = await matchOrderTester.matchOrdersAndVerifyBalancesAsync(
+                signedOrderLeft,
+                signedOrderRight,
+                defaultMakerAssetAddress,
+                defaultTakerAssetAddress,
+                zrxToken.address,
+                takerAddress,
+                erc20Balances,
+            );
+            // Verify left order was fully filled
+            const leftOrderInfo: [number, string, BigNumber] = await exchangeWrapper.getOrderInfoAsync(signedOrderLeft);
+            expect(leftOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FULLY_FILLED);
+            // Verify right order was fully filled
+            const rightOrderInfo: [number, string, BigNumber] = await exchangeWrapper.getOrderInfoAsync(
+                signedOrderRight,
+            );
+            expect(rightOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FULLY_FILLED);
+            // Verify taker did not take a profit
+            expect(takerInitialBalances).to.be.deep.equal(newErc20Balances[takerAddress][defaultMakerAssetAddress]);
+        });
+
         it('should transfer the correct amounts when left order is completely filled and right order is partially filled', async () => {
             // Create orders to match
             const signedOrderLeft = orderFactoryLeft.newSignedOrder({
