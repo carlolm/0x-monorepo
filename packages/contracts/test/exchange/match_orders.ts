@@ -34,7 +34,7 @@ chaiSetup.configure();
 const expect = chai.expect;
 const blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
 
-describe('matchOrdersAndVerifyBalancesAsync', () => {
+describe.only('matchOrdersAndVerifyBalancesAsync', () => {
     let makerAddressLeft: string;
     let makerAddressRight: string;
     let owner: string;
@@ -292,12 +292,15 @@ describe('matchOrdersAndVerifyBalancesAsync', () => {
             );
             expect(rightOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FULLY_FILLED);
             // Construct second right order
+            // Note: This order needs makerAssetAmount=90/takerAssetAmount=[anything <= 45] to fully fill the right order.
+            //       However, we use 100/50 to ensure a partial fill as we want to go down the "left fill"
+            //       branch in the contract twice for this test.
             const signedOrderRight2 = orderFactoryRight.newSignedOrder({
                 makerAddress: makerAddressRight,
                 makerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultTakerAssetAddress),
                 takerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultMakerAssetAddress),
-                makerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(90), 18),
-                takerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(6), 18),
+                makerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(100), 18),
+                takerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(50), 18),
                 feeRecipientAddress: feeRecipientAddressRight,
             });
             // Match signedOrderLeft with signedOrderRight2
@@ -314,11 +317,16 @@ describe('matchOrdersAndVerifyBalancesAsync', () => {
                 leftTakerAssetFilledAmount,
                 rightTakerAssetFilledAmount,
             );
-            // Verify left order was partially filled
+            // Verify left order was fully filled
             const leftOrderInfo2: [number, string, BigNumber] = await exchangeWrapper.getOrderInfoAsync(
                 signedOrderLeft,
             );
             expect(leftOrderInfo2[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FULLY_FILLED);
+            // Verify second right order was partially filled
+            const rightOrderInfo2: [number, string, BigNumber] = await exchangeWrapper.getOrderInfoAsync(
+                signedOrderRight2,
+            );
+            expect(rightOrderInfo2[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FILLABLE);
         });
 
         it('should transfer the correct amounts when consecutive calls are used to completely fill the right order', async () => {
@@ -359,12 +367,15 @@ describe('matchOrdersAndVerifyBalancesAsync', () => {
             );
             expect(rightOrderInfo[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FILLABLE);
             // Create second left order
+            // Note: This ored needs makerAssetAmount=96/takerAssetAmount=48 to fully fill the right order.
+            //       However, we use 100/50 to ensure a partial fill as we want to go down the "right fill"
+            //       branch in the contract twice for this test.
             const signedOrderLeft2 = orderFactoryLeft.newSignedOrder({
                 makerAddress: makerAddressLeft,
                 makerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultMakerAssetAddress),
                 takerAssetData: assetProxyUtils.encodeERC20ProxyData(defaultTakerAssetAddress),
-                makerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(900), 18),
-                takerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(48), 18),
+                makerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(100), 18),
+                takerAssetAmount: ZeroEx.toBaseUnitAmount(new BigNumber(50), 18),
                 feeRecipientAddress: feeRecipientAddressLeft,
             });
             // Match signedOrderLeft2 with signedOrderRight
@@ -384,6 +395,11 @@ describe('matchOrdersAndVerifyBalancesAsync', () => {
                 leftTakerAssetFilledAmount,
                 rightTakerAssetFilledAmount,
             );
+            // Verify second left order was partially filled
+            const leftOrderInfo2: [number, string, BigNumber] = await exchangeWrapper.getOrderInfoAsync(
+                signedOrderLeft2,
+            );
+            expect(leftOrderInfo2[0] as ExchangeStatus).to.be.equal(ExchangeStatus.ORDER_FILLABLE);
             // Verify right order was fully filled
             const rightOrderInfo2: [number, string, BigNumber] = await exchangeWrapper.getOrderInfoAsync(
                 signedOrderRight,
