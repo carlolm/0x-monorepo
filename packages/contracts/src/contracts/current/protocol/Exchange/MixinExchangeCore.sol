@@ -188,7 +188,7 @@ contract MixinExchangeCore is
         }
 
         // Ensure valid takerAssetFillAmount
-        if(takerAssetFillAmount <= 0) {
+        if (takerAssetFillAmount <= 0) {
             emit ExchangeStatus(uint8(Status.TAKER_ASSET_FILL_AMOUNT_TOO_LOW), orderHash);
             revert();
         }
@@ -213,7 +213,7 @@ contract MixinExchangeCore is
             FillResults memory fillResults)
     {
         // Fill Amount must be greater than 0
-        if(takerAssetFillAmount <= 0) {
+        if (takerAssetFillAmount <= 0) {
             status = uint8(Status.TAKER_ASSET_FILL_AMOUNT_TOO_LOW);
             return;
         }
@@ -336,7 +336,7 @@ contract MixinExchangeCore is
 
         // Validate transaction signed by maker
         address makerAddress = getCurrentContextAddress();
-        if(order.makerAddress != makerAddress) {
+        if (order.makerAddress != makerAddress) {
             emit ExchangeStatus(uint8(Status.INVALID_MAKER), orderHash);
             revert();
         }

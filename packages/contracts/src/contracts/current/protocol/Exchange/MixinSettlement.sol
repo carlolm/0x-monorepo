@@ -155,7 +155,7 @@ contract MixinSettlement is
         // distinct(MakerAsset, TakerAsset, zrx) then the only remaining
         // opportunity for optimization is when both feeRecipientAddress' are
         // the same.
-        if(leftOrder.feeRecipientAddress == rightOrder.feeRecipientAddress) {
+        if (leftOrder.feeRecipientAddress == rightOrder.feeRecipientAddress) {
             dispatchTransferFrom(
                 ZRX_PROXY_DATA,
                 takerAddress,
