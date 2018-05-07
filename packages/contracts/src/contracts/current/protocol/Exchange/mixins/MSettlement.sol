@@ -45,12 +45,12 @@ contract MSettlement is LibOrder, MMatchOrders {
     /// @dev Settles matched order by transferring appropriate funds between order makers, taker, and fee recipient.
     /// @param leftOrder First matched order.
     /// @param rightOrder Second matched order.
-    /// @param matchedFillOrderAmounts Struct holding amounts to transfer between makers, taker, and fee recipients.
-    /// @param taker Address that matched the orders. The taker receives the spread between orders as profit.
+    /// @param matchedFillResults Struct holding amounts to transfer between makers, taker, and fee recipients.
+    /// @param takerAddress Address that matched the orders. The taker receives the spread between orders as profit.
     function settleMatchedOrders(
         Order memory leftOrder,
         Order memory rightOrder,
-        MatchedOrderFillAmounts memory matchedFillOrderAmounts,
-        address taker)
+        MatchedFillResults memory matchedFillResults,
+        address takerAddress)
         internal;
 }

@@ -99,13 +99,13 @@ contract MixinSettlement is
     /// @dev Settles matched order by transferring appropriate funds between order makers, taker, and fee recipient.
     /// @param leftOrder First matched order.
     /// @param rightOrder Second matched order.
-    /// @param matchedFillOrderAmounts Struct holding amounts to transfer between makers, taker, and fee recipients.
-    /// @param taker Address that matched the orders. The taker receives the spread between orders as profit.
+    /// @param matchedFillResults Struct holding amounts to transfer between makers, taker, and fee recipients.
+    /// @param takerAddress Address that matched the orders. The taker receives the spread between orders as profit.
     function settleMatchedOrders(
         Order memory leftOrder,
         Order memory rightOrder,
-        MatchedOrderFillAmounts memory matchedFillOrderAmounts,
-        address taker)
+        MatchedFillResults memory matchedFillResults,
+        address takerAddress)
         internal
     {
         // Optimized for:
@@ -113,69 +113,69 @@ contract MixinSettlement is
 
         // Not optimized for:
         // * {left, right}.{MakerAsset, TakerAsset} == ZRX
-        // * {left, right}.maker, taker == {left, right}.feeRecipient
+        // * {left, right}.maker, takerAddress == {left, right}.feeRecipient
 
         // leftOrder.MakerAsset == rightOrder.TakerAsset
         // Taker should be left with a positive balance (the spread)
         dispatchTransferFrom(
             leftOrder.makerAssetData,
             leftOrder.makerAddress,
-            taker,
-            matchedFillOrderAmounts.left.makerAssetFilledAmount);
+            takerAddress,
+            matchedFillResults.left.makerAssetFilledAmount);
         dispatchTransferFrom(
             leftOrder.makerAssetData,
-            taker,
+            takerAddress,
             rightOrder.makerAddress,
-            matchedFillOrderAmounts.right.takerAssetFilledAmount);
+            matchedFillResults.right.takerAssetFilledAmount);
 
         // rightOrder.MakerAsset == leftOrder.TakerAsset
         // leftOrder.takerAssetFilledAmount ~ rightOrder.makerAssetFilledAmount
         // The change goes to right, not to taker.
-        assert(matchedFillOrderAmounts.right.makerAssetFilledAmount >= matchedFillOrderAmounts.left.takerAssetFilledAmount);
+        assert(matchedFillResults.right.makerAssetFilledAmount >= matchedFillResults.left.takerAssetFilledAmount);
         dispatchTransferFrom(
             rightOrder.makerAssetData,
             rightOrder.makerAddress,
             leftOrder.makerAddress,
-            matchedFillOrderAmounts.right.makerAssetFilledAmount);
+            matchedFillResults.right.makerAssetFilledAmount);
 
         // Maker fees
         dispatchTransferFrom(
             ZRX_PROXY_DATA,
             leftOrder.makerAddress,
             leftOrder.feeRecipientAddress,
-            matchedFillOrderAmounts.left.makerFeePaid);
+            matchedFillResults.left.makerFeePaid);
         dispatchTransferFrom(
             ZRX_PROXY_DATA,
             rightOrder.makerAddress,
             rightOrder.feeRecipientAddress,
-            matchedFillOrderAmounts.right.makerFeePaid);
+            matchedFillResults.right.makerFeePaid);
 
         // Taker fees
-        // If we assume distinct(left, right, taker) and
+        // If we assume distinct(left, right, takerAddress) and
         // distinct(MakerAsset, TakerAsset, zrx) then the only remaining
         // opportunity for optimization is when both feeRecipientAddress' are
         // the same.
         if(leftOrder.feeRecipientAddress == rightOrder.feeRecipientAddress) {
             dispatchTransferFrom(
                 ZRX_PROXY_DATA,
-                taker,
+                takerAddress,
                 leftOrder.feeRecipientAddress,
                 safeAdd(
-                    matchedFillOrderAmounts.left.takerFeePaid,
-                    matchedFillOrderAmounts.right.takerFeePaid
+                    matchedFillResults.left.takerFeePaid,
+                    matchedFillResults.right.takerFeePaid
                 )
             );
         } else {
             dispatchTransferFrom(
                 ZRX_PROXY_DATA,
-                taker,
+                takerAddress,
                 leftOrder.feeRecipientAddress,
-                matchedFillOrderAmounts.left.takerFeePaid);
+                matchedFillResults.left.takerFeePaid);
             dispatchTransferFrom(
                 ZRX_PROXY_DATA,
-                taker,
+                takerAddress,
                 rightOrder.feeRecipientAddress,
-                matchedFillOrderAmounts.right.takerFeePaid);
+                matchedFillResults.right.takerFeePaid);
         }
     }
 }

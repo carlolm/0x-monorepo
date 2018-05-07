@@ -26,7 +26,7 @@ contract MMatchOrders is
     MExchangeCore
 {
 
-    struct MatchedOrderFillAmounts {
+    struct MatchedFillResults {
         FillResults left;
         FillResults right;
     }
@@ -59,7 +59,7 @@ contract MMatchOrders is
     /// @param leftOrderFilledAmount Amount of left order already filled.
     /// @param rightOrderFilledAmount Amount of right order already filled.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
-    /// @return matchedFillOrderAmounts Amounts to fill left and right orders.
+    /// @return matchedFillResults Amounts to fill left and right orders.
     function calculateMatchedFillAmounts(
         Order memory leftOrder,
         Order memory rightOrder,
@@ -70,7 +70,7 @@ contract MMatchOrders is
         internal
         returns (
             uint8 status,
-            MatchedOrderFillAmounts memory matchedFillOrderAmounts);
+            MatchedFillResults memory matchedFillResults);
 
     /// @dev Match two complementary orders that have a positive spread.
     ///      Each order is filled at their respective price point. However, the calculations are
@@ -89,5 +89,5 @@ contract MMatchOrders is
         bytes rightSignature)
         public
         returns (
-            MatchedOrderFillAmounts memory matchedFillOrderAmounts);
+            MatchedFillResults memory matchedFillResults);
 }

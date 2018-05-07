@@ -34,20 +34,20 @@ contract MExchangeCore is LibOrder {
     /// @param order Order to gather information on.
     /// @return status Status of order. Statuses are defined in the LibStatus.Status struct.
     /// @return orderHash Keccak-256 EIP712 hash of the order.
-    /// @return filledAmount Amount of order that has been filled.
+    /// @return takerAssetFilledAmount Amount of order that has been filled.
     function getOrderInfo(Order memory order)
         public
         view
         returns (
             uint8 orderStatus,
             bytes32 orderHash,
-            uint256 filledAmount);
+            uint256 takerAssetFilledAmount);
 
     /// @dev Validates context for fillOrder. Succeeds or throws.
     /// @param order to be filled.
     /// @param orderStatus Status of order to be filled.
     /// @param orderHash Hash of order to be filled.
-    /// @param filledAmount Amount of order already filled.
+    /// @param takerAssetFilledAmount Amount of order already filled.
     /// @param signature Proof that the orders was created by its maker.
     /// @param takerAddress Address of order taker.
     /// @param takerAssetFillAmount Desired amount of order to fill by taker.
@@ -55,7 +55,7 @@ contract MExchangeCore is LibOrder {
         Order memory order,
         uint8 orderStatus,
         bytes32 orderHash,
-        uint256 filledAmount,
+        uint256 takerAssetFilledAmount,
         bytes memory signature,
         address takerAddress,
         uint256 takerAssetFillAmount)
@@ -64,14 +64,14 @@ contract MExchangeCore is LibOrder {
     /// @dev Calculates amounts filled and fees paid by maker and taker.
     /// @param order to be filled.
     /// @param orderStatus Status of order to be filled.
-    /// @param filledAmount Amount of order already filled.
+    /// @param takerAssetFilledAmount Amount of order already filled.
     /// @param takerAssetFillAmount Desired amount of order to fill by taker.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
     /// @return fillResults Amounts filled and fees paid by maker and taker.
-    function calculateFillAmounts(
+    function calculateFillResults(
         Order memory order,
         uint8 orderStatus,
-        uint256 filledAmount,
+        uint256 takerAssetFilledAmount,
         uint256 takerAssetFillAmount)
         public
         pure
