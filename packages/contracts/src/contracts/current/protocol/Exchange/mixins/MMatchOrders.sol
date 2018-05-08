@@ -47,6 +47,23 @@ contract MMatchOrders is
         Order memory rightOrder)
         internal;
 
+    /// @dev Validates matched fill results. Succeeds or throws.
+    /// @param matchedFillResults Amounts to fill and fees to pay by maker and taker of matched orders.
+    function validateMatchedOrderFillResultsOrThrow(MatchedFillResults memory matchedFillResults)
+        internal;
+
+    /// @dev Calculates partial value given a numerator and denominator.
+    ///      Throws if there is a rounding error.
+    /// @param numerator Numerator.
+    /// @param denominator Denominator.
+    /// @param target Value to calculate partial of.
+    /// @return Partial value of target.
+    function safeGetPartialAmount(
+        uint256 numerator,
+        uint256 denominator,
+        uint256 target)
+        internal pure
+        returns (uint256 partialAmount);
 
     /// @dev Calculates fill amounts for the matched orders.
     ///      Each order is filled at their respective price point. However, the calculations are
@@ -59,8 +76,8 @@ contract MMatchOrders is
     /// @param leftOrderFilledAmount Amount of left order already filled.
     /// @param rightOrderFilledAmount Amount of right order already filled.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
-    /// @return matchedFillResults Amounts to fill left and right orders.
-    function calculateMatchedFillAmounts(
+    /// @param matchedFillResults Amounts to fill and fees to pay by maker and taker of matched orders.
+    function calculateMatchedFillResults(
         Order memory leftOrder,
         Order memory rightOrder,
         uint8 leftOrderStatus,
@@ -80,14 +97,12 @@ contract MMatchOrders is
     /// @param rightOrder Second order to match.
     /// @param leftSignature Proof that order was created by the left maker.
     /// @param rightSignature Proof that order was created by the right maker.
-    /// @return leftFillResults Amounts filled and fees paid by maker and taker of left order.
-    /// @return leftFillResults Amounts filled and fees paid by maker and taker of right order.
+    /// @return matchedFillResults Amounts filled and fees paid by maker and taker of matched orders.
     function matchOrders(
         Order memory leftOrder,
         Order memory rightOrder,
         bytes leftSignature,
         bytes rightSignature)
         public
-        returns (
-            MatchedFillResults memory matchedFillResults);
+        returns (MatchedFillResults memory matchedFillResults);
 }

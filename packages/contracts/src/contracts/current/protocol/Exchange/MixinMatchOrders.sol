@@ -64,6 +64,35 @@ contract MixinMatchOrders is
         );
     }
 
+    /// @dev Validates matched fill results. Succeeds or throws.
+    /// @param matchedFillResults Amounts to fill and fees to pay by maker and taker of matched orders.
+    function validateMatchedOrderFillResultsOrThrow(MatchedFillResults memory matchedFillResults)
+        internal
+    {
+        // The right order must spend at least as much as we're transferring to the left order's maker.
+        // If the amount transferred from the right order is greater than what is transferred, it is a rounding error amount.
+        // Ensure this difference is negligible by dividing the values with each other. The result should equal to ~1.
+        require(matchedFillResults.right.makerAssetFilledAmount >= matchedFillResults.left.takerAssetFilledAmount);
+        require(!isRoundingError(matchedFillResults.right.makerAssetFilledAmount, matchedFillResults.left.takerAssetFilledAmount, 1));
+    }
+
+    /// @dev Calculates partial value given a numerator and denominator.
+    ///      Throws if there is a rounding error.
+    /// @param numerator Numerator.
+    /// @param denominator Denominator.
+    /// @param target Value to calculate partial of.
+    /// @return Partial value of target.
+    function safeGetPartialAmount(
+        uint256 numerator,
+        uint256 denominator,
+        uint256 target)
+        internal pure
+        returns (uint256 partialAmount)
+    {
+        require(!isRoundingError(numerator, denominator, target));
+        return getPartialAmount(numerator, denominator, target);
+    }
+
     /// @dev Calculates fill amounts for the matched orders.
     ///      Each order is filled at their respective price point. However, the calculations are
     ///      carried out as though the orders are both being filled at the right order's price point.
@@ -75,8 +104,8 @@ contract MixinMatchOrders is
     /// @param leftOrderFilledAmount Amount of left order already filled.
     /// @param rightOrderFilledAmount Amount of right order already filled.
     /// @return status Return status of calculating fill amounts. Returns Status.SUCCESS on success.
-    /// @return matchedFillResults Amounts to fill left and right orders.
-    function calculateMatchedFillAmounts(
+    /// @param matchedFillResults Amounts to fill and fees to pay by maker and taker of matched orders.
+    function calculateMatchedFillResults(
         Order memory leftOrder,
         Order memory rightOrder,
         uint8 leftOrderStatus,
@@ -97,93 +126,61 @@ contract MixinMatchOrders is
         //    <leftTakerAssetAmountRemaining> * <rightOrder.takerAssetAmount> <= <rightTakerAssetAmountRemaining> * <rightOrder.makerAssetAmount>
         uint256 rightTakerAssetAmountRemaining = safeSub(rightOrder.takerAssetAmount, rightOrderFilledAmount);
         uint256 leftTakerAssetAmountRemaining = safeSub(leftOrder.takerAssetAmount, leftOrderFilledAmount);
+        uint256 leftOrderAmountToFill = 0;
+        uint256 rightOrderAmountToFill = 0;
         if (
             safeMul(leftTakerAssetAmountRemaining, rightOrder.takerAssetAmount) <=
             safeMul(rightTakerAssetAmountRemaining, rightOrder.makerAssetAmount)
         ) {
             // Left order is the constraint: maximally fill left
-            (   status,
-                matchedFillResults.left
-            ) = calculateFillResults(
-                leftOrder,
-                leftOrderStatus,
-                leftOrderFilledAmount,
-                leftTakerAssetAmountRemaining);
-            if (status != uint8(Status.SUCCESS)) {
-                return (status, matchedFillResults);
-            }
+            leftOrderAmountToFill = leftTakerAssetAmountRemaining;
 
-            // The right order just spent <leftTakerAssetAmountRemaining> of their maker asset to fill the left order.
-            // The amount right gets in return is:
-            //    <leftOrderAmountBought> * <rightOrderProfitPerUnitSold>
-            // =  <matchedFillResults.left.takerAssetFilledAmount> * <rightOrder.takerAssetAmount> / <rightOrder.makerAssetAmount>
-            // TODO: Ensure rounding error is in the right direction.
-            if (isRoundingError(rightOrder.takerAssetAmount, rightOrder.makerAssetAmount, matchedFillResults.left.takerAssetFilledAmount)) {
-                status = uint8(Status.ROUNDING_ERROR_TOO_LARGE);
-                return (status, matchedFillResults);
-            }
-            uint256 rightOrderAmountToFill = getPartialAmount(
+            // The right order receives an amount proportional to how much was spent.
+            // TODO: Ensure rounding error is in the correct direction.
+            rightOrderAmountToFill = safeGetPartialAmount(
                 rightOrder.takerAssetAmount,
                 rightOrder.makerAssetAmount,
-                matchedFillResults.left.takerAssetFilledAmount);
-
-            // Compute fill amounts for right order
-            (   status,
-                matchedFillResults.right
-            ) = calculateFillResults(
-                rightOrder,
-                rightOrderStatus,
-                rightOrderFilledAmount,
-                rightOrderAmountToFill);
-            if (status != uint8(Status.SUCCESS)) {
-                return (status, matchedFillResults);
-            }
-
-            // The right order must spend at least as much as we're transferring to the left order's maker.
-            // If the amount transferred from the right order is greater than what is transferred, it is a rounding error amount.
-            // Ensure this difference is negligible by dividing the values with each other. The result should equal to ~1.
-            assert(matchedFillResults.right.makerAssetFilledAmount >= matchedFillResults.left.takerAssetFilledAmount);
-            if (isRoundingError(matchedFillResults.right.makerAssetFilledAmount, matchedFillResults.left.takerAssetFilledAmount, 1)) {
-                status = uint8(Status.ROUNDING_ERROR_TOO_LARGE);
-                return (status, matchedFillResults);
-            }
+                leftOrderAmountToFill);
         } else {
             // Right order is the constraint: maximally fill right
-            (   status,
-                matchedFillResults.right
-            ) = calculateFillResults(
-                rightOrder,
-                rightOrderStatus,
-                rightOrderFilledAmount,
-                rightTakerAssetAmountRemaining);
-            if (status != uint8(Status.SUCCESS)) {
-                return (status, matchedFillResults);
-            }
+            rightOrderAmountToFill = rightTakerAssetAmountRemaining;
 
-            // The left order just spent <rightTakerAssetAmountRemaining> of their maker asset to fill the right order.
-            // The amount left gets in return is:
-            //    <rightOrderAmountBought> * <rightCostPerUnitSold>
-            //   (let Y = <matchedFillResults.right.takerAssetFilledAmount>; let X = matchedFillResults.right.makerAssetFilledAmount)
-            // = Y * X / Y
-            // = X = <matchedFillResults.right.makerAssetFilledAmount>
-            //
-            // Sanity check: that the amount transferred by the right order does not exceed the amount required to fill the left order.
-            assert(matchedFillResults.right.makerAssetFilledAmount <= leftTakerAssetAmountRemaining);
-            (   status,
-                matchedFillResults.left
-            ) = calculateFillResults(
-                leftOrder,
-                leftOrderStatus,
-                leftOrderFilledAmount,
-                matchedFillResults.right.makerAssetFilledAmount);
-            if (status != uint8(Status.SUCCESS)) {
-                return (status, matchedFillResults);
-            }
-
-            // Sanity check: the amount sent from the right order must equal the amount received by the left order.
-            assert(matchedFillResults.right.makerAssetFilledAmount == matchedFillResults.left.takerAssetFilledAmount);
+            // The left order receives an amount proportional to how much was spent.
+            // TODO: Ensure rounding error is in the correct direction.
+            leftOrderAmountToFill = safeGetPartialAmount(
+                rightOrder.makerAssetAmount,
+                rightOrder.takerAssetAmount,
+                rightOrderAmountToFill);
         }
 
+        // Calculate fill results for left order
+        (   status,
+            matchedFillResults.left
+        ) = calculateFillResults(
+            leftOrder,
+            leftOrderStatus,
+            leftOrderFilledAmount,
+            leftOrderAmountToFill);
+        if (status != uint8(Status.SUCCESS)) {
+            return (status, matchedFillResults);
+        }
+
+        // Calculate fill results for right order
+        (   status,
+            matchedFillResults.right
+        ) = calculateFillResults(
+            rightOrder,
+            rightOrderStatus,
+            rightOrderFilledAmount,
+            rightOrderAmountToFill);
+        if (status != uint8(Status.SUCCESS)) {
+            return (status, matchedFillResults);
+        }
+
+        // Validate the fill results
+        validateMatchedOrderFillResultsOrThrow(matchedFillResults);
+
+        // Return status & fill results
         return (status, matchedFillResults);
     }
 
@@ -195,8 +192,7 @@ contract MixinMatchOrders is
     /// @param rightOrder Second order to match.
     /// @param leftSignature Proof that order was created by the left maker.
     /// @param rightSignature Proof that order was created by the right maker.
-    /// @return leftFillResults Amounts filled and fees paid by maker and taker of left order.
-    /// @return leftFillResults Amounts filled and fees paid by maker and taker of right order.
+    /// @return matchedFillResults Amounts filled and fees paid by maker and taker of matched orders.
     function matchOrders(
         Order memory leftOrder,
         Order memory rightOrder,
@@ -237,7 +233,7 @@ contract MixinMatchOrders is
         uint8 matchedFillAmountsStatus;
         (   matchedFillAmountsStatus,
             matchedFillResults
-        ) = calculateMatchedFillAmounts(
+        ) = calculateMatchedFillResults(
             leftOrder,
             rightOrder,
             leftOrderInfo.orderStatus,
